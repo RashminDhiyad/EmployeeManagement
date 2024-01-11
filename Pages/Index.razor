@@ -1,0 +1,204 @@
+﻿@page "/"
+@using DxBlazorCRUD.Data
+@using DevExpress.Export
+@inject EmployeeService employeesService
+
+<h3 class="card-title">Employee List</h3>
+<hr />
+
+<DxGrid Data="employees"
+        PageSize="20"
+        CssClass="ch-480"
+        EditModelSaving="OnEditModelSaving"
+        DataItemDeleting="OnDataItemDeleting"
+        KeyFieldName="Id"
+        EditMode="GridEditMode.PopupEditForm"
+        FocusedRowEnabled=true
+        PagerPosition="GridPagerPosition.Bottom"
+        PagerNavigationMode="PagerNavigationMode.InputBox"
+        PageSizeSelectorAllRowsItemVisible="true"
+        PageSizeSelectorVisible="true"
+        PageSizeSelectorItems="@(new int[] { 5, 10, 15,50,100 })"
+        PagerSwitchToInputBoxButtonCount="10"
+        ShowSearchBox="true"
+        PagerVisibleNumericButtonCount="10"
+        VirtualScrollingEnabled="true"
+        @ref=MyGrid>
+    <Columns>
+        <DxGridDataColumn Caption="Emp No." FieldName="Id" />
+        <DxGridDataColumn Caption="First Name" FieldName="FirstName" />
+        <DxGridDataColumn Caption="Last Name" FieldName="LastName" />
+        <DxGridDataColumn Caption="Designation" FieldName="Designation" />
+        <DxGridDataColumn Caption="Address" FieldName="Address" />
+        <DxGridDataColumn Caption="City" FieldName="City" />
+        <DxGridDataColumn Caption="Postal Code" FieldName="PostalCode" />
+        <DxGridDataColumn Caption="Email" FieldName="EmailAddress" />
+        <DxGridDataColumn Caption="Phone Number" FieldName="PhoneNumber" />
+    </Columns>
+    <ToolbarTemplate>
+        <DxToolbar>
+            <DxToolbarItem Text="New"
+                           IconCssClass="grid-new-row"
+                           Click="OnCreateNew" />
+            <DxToolbarItem Text="Edit"
+                           IconCssClass="grid-edit-row"
+                           Click="OnEdit" />
+            <DxToolbarItem Text="Delete"
+                           IconCssClass="grid-delete-row"
+                           Click="OnDelete" />
+            <DxToolbarItem Text="Column Chooser"
+                           RenderStyle="ButtonRenderStyle.Secondary"
+                           IconCssClass="grid-column-chooser"
+                           CssClass="column-chooser-button"
+                           BeginGroup="true"
+                           Click="OnShowColumnChooser" />
+            <DxToolbarItem Text="Export"
+                           IconCssClass="oi-file"
+                           Click="ExportXlsx_Click" />
+        </DxToolbar>
+    </ToolbarTemplate>
+    <EditFormTemplate Context="editFormContext">
+        <DxFormLayout>
+            <DxFormLayoutItem Caption="First Name:">
+                @editFormContext.GetEditor("FirstName")
+            </DxFormLayoutItem>
+            <DxFormLayoutItem Caption="Last Name:">
+                @editFormContext.GetEditor("LastName")
+            </DxFormLayoutItem>
+            <DxFormLayoutItem Caption="Designation:">
+                    @editFormContext.GetEditor("Designation")
+            </DxFormLayoutItem>
+            <DxFormLayoutItem Caption="Address:">
+                    @editFormContext.GetEditor("Address")
+            </DxFormLayoutItem>
+             <DxFormLayoutItem Caption="City:">
+                    @editFormContext.GetEditor("City")
+            </DxFormLayoutItem>
+             <DxFormLayoutItem Caption="Postal Code:">
+                    @editFormContext.GetEditor("PostalCode")
+            </DxFormLayoutItem>
+             <DxFormLayoutItem Caption="Email:">
+                    @editFormContext.GetEditor("EmailAddress")
+            </DxFormLayoutItem>
+            <DxFormLayoutItem Caption="Phone Number:">
+                    @editFormContext.GetEditor("PhoneNumber")
+            </DxFormLayoutItem>
+            <DxFormLayoutItem ColSpanMd="12">
+                <ValidationSummary />
+            </DxFormLayoutItem>
+        </DxFormLayout>
+    </EditFormTemplate>
+</DxGrid>
+
+
+
+@code {
+    IGrid MyGrid { get; set; }
+    IEnumerable<object> employees;
+    [Parameter]
+    public SizeMode SizeMode { get; set; }
+    [Parameter]
+    public bool KeyboardNavigationEnabled { get; set; }
+    protected override async Task OnInitializedAsync()
+    {
+        employees = await Task.Run(() => employeesService.GetAllEmployeesAsync());
+    }
+
+    async Task OnEditModelSaving(GridEditModelSavingEventArgs e)
+    {
+        var editModel = (Employee)e.EditModel;
+        // Re-query a data item from the database.
+        var dataItem = e.IsNew ? new Employee() : await Task.Run(() => employeesService.GetEmployeeById(Convert.ToInt32(editModel.Id)));
+        // Assign changes from the edit model to the data item.
+        
+        if (dataItem != null) {
+            dataItem.FirstName = editModel.FirstName;
+            dataItem.LastName = editModel.LastName;
+            dataItem.Designation = editModel.Designation;
+            dataItem.Address = editModel.Address;
+            dataItem.City = editModel.City;
+            dataItem.PostalCode = editModel.PostalCode;
+            dataItem.EmailAddress = editModel.EmailAddress;
+            dataItem.PhoneNumber = editModel.PhoneNumber;
+          
+             if (e.IsNew)
+                await employeesService.AddNewEmployee(dataItem);
+             else
+                await employeesService.UpdateEmployeeDetails(dataItem);
+            // Reload the entire Grid.
+            employees = await Task.Run(() => employeesService.GetAllEmployeesAsync());
+        }
+        
+    }
+
+    async Task OnDataItemDeleting(GridDataItemDeletingEventArgs e)
+    {
+        // Re-query a data item from the database.
+        var dataItem = await Task.Run(() => employeesService.GetEmployeeById(Convert.ToInt32((e.DataItem as Employee).Id)));
+        if (dataItem != null)
+        {
+            await employeesService.DeleteEmployee(dataItem);
+
+            // Reload the entire Grid.
+            employees = await Task.Run(() => employeesService.GetAllEmployeesAsync());
+        }
+    }
+
+
+    async Task OnCreateNew(ToolbarItemClickEventArgs e)
+    {
+        await MyGrid.StartEditNewRowAsync();
+    }
+
+    async Task OnEdit(ToolbarItemClickEventArgs e)
+    {
+        if (MyGrid.GetFocusedDataItem() != null)
+            await MyGrid.StartEditDataItemAsync(MyGrid.GetFocusedDataItem());
+    }
+
+    void OnDelete(ToolbarItemClickEventArgs e)
+    {
+        if (MyGrid.GetFocusedDataItem() != null)
+            MyGrid.ShowDataItemDeleteConfirmation(MyGrid.GetFocusedDataItem());
+    }
+
+    void OnShowColumnChooser()
+    {
+        MyGrid.ShowColumnChooser(".column-chooser-button");
+    }
+
+    async Task ExportXlsx_Click() {
+        await MyGrid.ExportToXlsxAsync("ExportResult", new GridXlExportOptions() {
+            CustomizeCell = OnCustomizeCell,
+             CustomizeSheet = CustomizeSheet,
+        });
+    }
+
+    void OnCustomizeCell (GridExportCustomizeCellEventArgs e) {
+         if (e.AreaType == DevExpress.Export.SheetAreaType.DataArea) {
+            // Sets the Handled property to true to apply the specified settings.
+            e.Handled = true;
+        }
+       if (e.AreaType == DevExpress.Export.SheetAreaType.Header) {
+            // Applies bold formatting to column headers
+            e.Formatting.Font = new XlCellFont() { Bold = true };
+            e.Handled = true;
+        }
+    }
+
+      void CustomizeSheet(GridExportCustomizeSheetEventArgs e) {
+        // Freezes the left column and the top row
+        e.Sheet.SplitPosition = new DevExpress.Export.Xl.XlCellPosition(1, 1);
+        // Specifies the document print settings
+        e.Sheet.PageMargins = new DevExpress.Export.Xl.XlPageMargins();
+        e.Sheet.PageMargins.PageUnits = DevExpress.Export.Xl.XlPageUnits.Centimeters;
+        e.Sheet.PageMargins.Left = 3.0;
+        e.Sheet.PageMargins.Right = 3.0;
+        e.Sheet.PageMargins.Top = 3.25;
+        e.Sheet.PageMargins.Bottom = 3.25;
+        e.Sheet.PageSetup.PaperKind = DevExpress.Drawing.Printing.DXPaperKind.A4;
+        e.Sheet.PageSetup.PageOrientation = DevExpress.Export.Xl.XlPageOrientation.Landscape;
+        e.Sheet.PrintTitles.SetColumns(0, 0);
+        e.Sheet.PrintTitles.SetRows(0, 0);
+    }
+}
